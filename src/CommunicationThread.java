@@ -21,6 +21,7 @@ public class CommunicationThread implements Runnable
 	{
 		try
 		{
+			String username = null;
 			try
 			{
 				InputStream inStream = incoming.getInputStream();
@@ -30,22 +31,26 @@ public class CommunicationThread implements Runnable
 				PrintWriter out = new PrintWriter(outStream, true);
 				
 				out.println("Hello! What is your username?");
-				String username = in.nextLine();
+				username = in.nextLine().trim();
+				
+				System.out.println(username);
 				
 				while(users.list.containsKey(username))
 				{
 					out.println("This username \"" + username + "\" already exists! Try again: ");
-					username = in.nextLine();
+					username = in.nextLine().trim();
 				}
 				
 				users.list.put(username, incoming.getRemoteSocketAddress());
 				
-				printMenu(out);
+				out.println("Welcome!");
+				
+				//printMenu(out);
 				
 				boolean done = false;
-				while(!done)
+				while(!done && in.hasNextLine())
 				{
-					String input = in.next();
+					String input = in.nextLine().trim();
 					
 					switch(input)
 					{
@@ -69,7 +74,6 @@ public class CommunicationThread implements Runnable
 						case "d":
 							done = true;
 							out.println("Bye!");
-							users.list.remove(username);
 							break;
 						case "h":
 							printMenu(out);
@@ -84,6 +88,8 @@ public class CommunicationThread implements Runnable
 			}
 			finally
 			{
+				System.out.println("BYE " + username + "!");
+				users.list.remove(username);
 				incoming.close();
 			}
 		}
@@ -99,7 +105,7 @@ public class CommunicationThread implements Runnable
 		out.println("|            Menu           |");
 		out.println("|---------------------------|");
 		out.println("|'p'|  Print users list     |");
-		out.println("|'m'|  Message a users      |");
+		out.println("|'m'|  Message a user       |");
 		out.println("|'d'|  Disconnect           |");
 		out.println("|'h'|  Print menu           |");
 		out.println("|---------------------------|\n");
