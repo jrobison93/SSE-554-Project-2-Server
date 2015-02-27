@@ -6,10 +6,17 @@ import java.net.Socket;
 import java.util.Scanner;
 
 
-public class CommunicationThread implements Runnable
+public class CommunicationThread extends Thread
 {
+	private MessageServer server;
 	private Socket incoming;
 	private UsersList users;
+	
+	private Scanner in;
+	private PrintWriter out;
+	
+	private String username;
+	private String receiver;
 	
 	public CommunicationThread(Socket i)
 	{
@@ -21,14 +28,13 @@ public class CommunicationThread implements Runnable
 	{
 		try
 		{
-			String username = null;
 			try
 			{
 				InputStream inStream = incoming.getInputStream();
 				OutputStream outStream = incoming.getOutputStream();
 				
-				Scanner in = new Scanner(inStream);
-				PrintWriter out = new PrintWriter(outStream, true);
+				in = new Scanner(inStream);
+				out = new PrintWriter(outStream, true);
 				
 				out.println("Hello! What is your username?");
 				username = in.nextLine().trim();
@@ -41,56 +47,39 @@ public class CommunicationThread implements Runnable
 					username = in.nextLine().trim();
 				}
 				
-				users.list.put(username, incoming.getRemoteSocketAddress());
+				users.list.put(username, this);
 				
-				out.println("Welcome!");
+				out.println("Welcome, " + username + "!");
 				
-				//printMenu(out);
+				printUsers();
 				
-				boolean done = false;
-				while(!done && in.hasNextLine())
+				while(users.list.size() >= 1)
 				{
-					String input = in.nextLine().trim();
-					
-					switch(input)
+					out.println("Who would you like to message? \n");
+					receiver = in.nextLine().trim();
+					while(!users.list.containsKey(receiver))
 					{
-						case "p":
-							printUsers(out);
-							break;
-						case "m":
-							out.println("What user would you like to message? ");
-							String user = in.nextLine();
-							
-							if(users.list.containsKey(user))
-							{
-								
-							}
-							else
-							{
-								out.println("The username \"" + user + "\" does not exist!");
-							}
-							
-							break;
-						case "d":
-							done = true;
-							out.println("Bye!");
-							break;
-						case "h":
-							printMenu(out);
-							break;
-						default:
-							out.println("Invalid command! Type 'h' to reprint the menu.");
-							break;
+						out.println("The user does not exist. \n");
+						receiver = in.nextLine().trim();
 					}
-					
+					break;
 				}
+				
+				System.out.println("Receiver: " + receiver + "\n");
+				
+				while(in.hasNextLine())
+				{
+					sendToUser(username, receiver, in.nextLine());
+					System.out.println("Message Sent " + username +"\n");
+				}
+				
+				
 				
 			}
 			finally
 			{
-				System.out.println("BYE " + username + "!");
-				users.list.remove(username);
-				incoming.close();
+				close();
+				stop();
 			}
 		}
 		catch(IOException e)
@@ -100,18 +89,40 @@ public class CommunicationThread implements Runnable
 		
 	}
 	
-	private void printMenu(PrintWriter out)
+	public void sendToClient(String message)
 	{
-		out.println("|            Menu           |");
-		out.println("|---------------------------|");
-		out.println("|'p'|  Print users list     |");
-		out.println("|'m'|  Message a user       |");
-		out.println("|'d'|  Disconnect           |");
-		out.println("|'h'|  Print menu           |");
-		out.println("|---------------------------|\n");
+		out.println(message);
 	}
 	
-	private void printUsers(PrintWriter out)
+	public void sendToUser(String sender, String receiver, String text)
+	{
+		if(users.list.containsKey(receiver))
+		{
+			users.list.get(receiver).sendToClient(sender + ": " + text);
+			if(text.equals("_bye_"))
+			{
+				try
+				{
+					close();
+				}
+				catch(IOException e)
+				{
+					System.out.println("Error closing thread: " + e);
+				}
+				stop();
+				
+			}
+		}
+		else
+		{
+			sendToClient("User not found.");
+			//printUsers();
+			
+		}
+	}
+	
+	
+	private void printUsers()
 	{
 		if(users.list.size() == 0)
 		{
@@ -119,12 +130,25 @@ public class CommunicationThread implements Runnable
 		}
 		else
 		{
-			out.println("These are the available users: ");
+			out.print("These are the available users: \n");
 			for(String key : users.list.keySet())
 			{
-				out.println("\t" + key);
+				out.print("\t" + key +"\n");
 			}
 		}
+		
+		out.flush();
+	}
+	
+	public void close() throws IOException
+	{
+		users.list.remove(username);
+		if(incoming != null)
+			incoming.close();
+		if(in != null)
+			in.close();
+		if(out != null)
+			out.close();
 	}
 
 }
